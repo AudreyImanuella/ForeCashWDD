@@ -75,6 +75,7 @@ export async function tambahTransaksi(_prev: Hasil, fd: FormData): Promise<Hasil
   return sukses('Transaksi tersimpan.')
 }
 
+<<<<<<< HEAD
 /** Hasil simpan dari Scan Struk. id dipakai untuk tautan "Ubah" dan pratinjau foto. */
 export type HasilScan = { ok?: string; error?: string; id?: number }
 
@@ -105,6 +106,8 @@ export async function simpanDariScan(fd: FormData): Promise<HasilScan> {
   return { ok: 'Struk tersimpan sebagai pengeluaran.', id: Number(data.id) }
 }
 
+=======
+>>>>>>> 64aa72d10e316b62f6ddfcec23de0ce61f31a3c5
 export async function ubahTransaksi(id: number, _prev: Hasil, fd: FormData): Promise<Hasil> {
   const { supabase, profil } = await wajibLogin('mahasiswa')
   const { data: lama } = await supabase.from('transactions').select('id, bukti').eq('id', id).eq('user_id', profil.id).maybeSingle()

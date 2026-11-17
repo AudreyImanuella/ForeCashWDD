@@ -7,7 +7,10 @@ import { ambilWallet, kategoriEmoji, type Jenis } from '@/lib/data'
 import { rupiah } from '@/lib/format'
 import { bulanDariParam, hariIni, rentangBulan, tgl } from '@/lib/tanggal'
 import TxForm, { type OpsiKategori } from './components/TxForm'
+<<<<<<< HEAD
 import ScanStruk from './components/ScanStruk'
+=======
+>>>>>>> 64aa72d10e316b62f6ddfcec23de0ce61f31a3c5
 import TombolHapus from '@/components/TombolHapus'
 import BatasHarianForm from './components/BatasHarianForm'
 import KategoriSaya from './components/KategoriSaya'
@@ -54,7 +57,10 @@ export default async function TransaksiPage({ searchParams }: { searchParams: Pr
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+<<<<<<< HEAD
           <ScanStruk wallets={wallets} kategori={kategori} />
+=======
+>>>>>>> 64aa72d10e316b62f6ddfcec23de0ce61f31a3c5
           <TxForm aksi={tambahTransaksi} wallets={wallets} kategori={kategori} awal={{ jenis: jenisAwal, wallet_id: wallets[0]?.id }} mode="baru" />
 
           <div className="hs-card p-5 space-y-3">
