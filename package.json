@@ -7,15 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-<<<<<<< HEAD
     "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
-    "20": "^3.1.9",
-=======
-   "test": "node --experimental-strip-types --test tests/*.test.ts"  },
-  "dependencies": {
->>>>>>> 64aa72d10e316b62f6ddfcec23de0ce61f31a3c5
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
@@ -24,12 +18,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
-<<<<<<< HEAD
-    "resend": "^6.37.0",
-    "tesseract.js": "^7.0.0"
-=======
     "resend": "^6.37.0"
->>>>>>> 64aa72d10e316b62f6ddfcec23de0ce61f31a3c5
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
