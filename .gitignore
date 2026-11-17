@@ -1,0 +1,26 @@
+# dependensi
+/node_modules
+
+# hasil build Next.js
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# rahasia: JANGAN pernah di-commit
+.env
+.env*.local
+
+# Vercel
+.vercel
+
+# sistem operasi & editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# log
+npm-debug.log*
