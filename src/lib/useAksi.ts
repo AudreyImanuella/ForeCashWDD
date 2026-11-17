@@ -25,7 +25,9 @@ export function useAksi(aksi: (prev: Hasil, fd: FormData) => Promise<Hasil>, { r
     e.preventDefault()
     const form = e.currentTarget
     if (sebelum && !sebelum(form)) return
-    const fd = new FormData(form)
+    // ikutkan tombol yang diklik (name/value-nya), misalnya tombol "Abaikan"
+    const tombol = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null
+    const fd = tombol ? new FormData(form, tombol) : new FormData(form)
     startTransition(() => dispatch(fd))
   }
 

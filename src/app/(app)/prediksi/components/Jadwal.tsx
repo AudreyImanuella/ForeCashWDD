@@ -8,6 +8,7 @@ import { rupiah } from '@/lib/format'
 import { tgl } from '@/lib/tanggal'
 import { konfirmasiNominal } from '@/app/(app)/transaksi/components/TxForm'
 import { hapusJadwal, jadwalDiterima, tambahJadwal } from '../actions'
+import InputRupiah from '@/components/form/InputRupiah'
 
 export type Jadwal = { id: number; sumber: string; nominal: number; tanggal_perkiraan: string }
 
@@ -52,7 +53,7 @@ export function TambahJadwalForm() {
       <h4 className="text-sm font-black">Tambah Jadwal Pemasukan</h4>
       <Flash hasil={hasil} />
       <div><label htmlFor="js" className="text-xs font-bold">Sumber</label><input id="js" name="sumber" required maxLength={50} placeholder="Uang saku dari orang tua" className="w-full px-3 py-2 text-xs border" /></div>
-      <div><label htmlFor="jn" className="text-xs font-bold">Perkiraan nominal (Rp)</label><input id="jn" type="number" name="nominal" min="1" required className="w-full px-3 py-2 text-xs border" /></div>
+      <div><label htmlFor="jn" className="text-xs font-bold">Perkiraan nominal (Rp)</label><InputRupiah id="jn" name="nominal" required placeholder="1.500.000" /></div>
       <div><label htmlFor="jt" className="text-xs font-bold">Tanggal perkiraan</label><input id="jt" type="date" name="tanggal" required className="w-full px-3 py-2 text-xs border" /></div>
       <button disabled={pending} className="hs-btn bg-hsOrange text-white w-full py-2.5 text-xs disabled:opacity-60">Simpan Jadwal</button>
     </form>

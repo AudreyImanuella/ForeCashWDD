@@ -108,7 +108,11 @@ export default function ScanStruk({ wallets, kategori }: { wallets: OpsiWallet[]
 
       setLangkah('Membaca struk...')
       const { createWorker } = await import('tesseract.js')
+      // file pembaca teks disimpan sendiri di /public/tesseract (tidak bergantung CDN luar)
       const worker = await createWorker('eng', 1, {
+        workerPath: '/tesseract/worker.min.js',
+        corePath: '/tesseract/core',
+        langPath: '/tesseract/lang',
         logger: (m) => { if (m.status === 'recognizing text') setPersen(Math.round(m.progress * 100)) },
       })
       let teks = ''
@@ -143,8 +147,9 @@ export default function ScanStruk({ wallets, kategori }: { wallets: OpsiWallet[]
       const r = await simpanDariScan(fd)
       if (r.error || !r.id) return setGalat(r.error ?? 'Gagal menyimpan. Coba lagi.')
       setSimpan({ id: r.id, nominal: h.nominal, keterangan, kategori: cocok.nama, tanggal })
-    } catch {
-      setGalat('Gagal membaca struk. Pastikan internet aktif (pembaca teks diunduh saat pertama kali dipakai), lalu coba lagi.')
+    } catch (e) {
+      console.error('[ScanStruk]', e)
+      setGalat('Gagal membaca struk. Muat ulang halaman (Ctrl+Shift+R) lalu coba lagi. Kalau masih gagal, coba foto lain.')
     } finally {
       setSibuk(false)
       setLangkah('')

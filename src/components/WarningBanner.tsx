@@ -90,6 +90,10 @@ export default function WarningBanner({ f, avatarId, buddy }: Props) {
           )}
         </p>
 
+        {f.rencanaDulu > 0 && (
+          <p className="fc-hero-plan">Sudah memperhitungkan rencana pengeluaran {rupiah(f.rencanaDulu)} sebelum uang berikutnya datang.</p>
+        )}
+
         {f.terlambat.map((t) => (
           <p key={t.id} style={{ color: '#C22C2C' }}>
             <TriangleAlert size={15} className="inline -mt-0.5" /> {t.sumber} ({rupiah(t.nominal)}) belum datang sejak {tgl(t.tanggal_perkiraan)}.

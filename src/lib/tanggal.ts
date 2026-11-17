@@ -75,3 +75,13 @@ export function namaBulan(bulan: string): string {
 export function bulanDariParam(q: string | undefined | null): string {
   return q && /^\d{4}-(0[1-9]|1[0-2])$/.test(q) ? q : hariIni().slice(0, 7)
 }
+
+/** Tanggal yang sama bulan depan (atau n bulan); kalau tanggalnya tidak ada, pakai akhir bulan. '2026-01-31' -> '2026-02-28'. */
+export function tambahBulan(t: string, n = 1): string {
+  const [y, m, d] = t.split('-').map(Number)
+  const total = y * 12 + (m - 1) + n
+  const ty = Math.floor(total / 12)
+  const tm = (total % 12) + 1
+  const akhir = new Date(Date.UTC(ty, tm, 0)).getUTCDate()
+  return `${ty}-${String(tm).padStart(2, '0')}-${String(Math.min(d, akhir)).padStart(2, '0')}`
+}
