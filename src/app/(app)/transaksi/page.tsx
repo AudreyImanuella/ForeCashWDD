@@ -1,107 +1,172 @@
-// Halaman Transaksi (port dari php-version/pages/transaksi.php).
-import Link from 'next/link'
-import { Download, Pencil, ReceiptText } from 'lucide-react'
-import Flash from '@/components/Flash'
+'use server'
+
+// Aksi halaman Transaksi (pengganti blok "if POST" di transaksi.php & transaksi_edit.php).
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { wajibLogin } from '@/lib/auth'
-import { ambilWallet, kategoriEmoji, type Jenis } from '@/lib/data'
-import { rupiah } from '@/lib/format'
-import { bulanDariParam, hariIni, rentangBulan, tgl } from '@/lib/tanggal'
-import TxForm, { type OpsiKategori } from './components/TxForm'
-import TombolHapus from '@/components/TombolHapus'
-import BatasHarianForm from './components/BatasHarianForm'
-import KategoriSaya from './components/KategoriSaya'
-import { hapusTransaksi, tambahTransaksi } from './actions'
+import { angka, gagal, sukses, teks, type Hasil } from '@/lib/aksi'
+import { ambilFile, hapusStruk, simpanStruk } from '@/lib/struk'
+import { hariIni } from '@/lib/tanggal'
+import type { Jenis } from '@/lib/data'
 
-export const metadata = { title: 'Transaksi' }
-
-const KELAS = { pemasukan: 'is-in', pengeluaran: 'is-out', transfer: 'is-move' }
-const WARNA = { pemasukan: 'text-hsGreen', pengeluaran: 'text-hsRed', transfer: 'text-hsBlue' }
-const TANDA = { pemasukan: '+', pengeluaran: '−', transfer: '' }
-
-type Baris = {
-  id: number; tanggal: string; jenis: Jenis; nominal: number; keterangan: string; bukti: string | null
-  kategori: { nama: string } | null; wallet: { nama: string } | null; tujuan: { nama: string } | null
+type TxValid = {
+  jenis: Jenis; nominal: number; keterangan: string; tanggal: string
+  wallet_id: number; wallet_tujuan_id: number | null; category_id: number | null
 }
 
-export default async function TransaksiPage({ searchParams }: { searchParams: Promise<{ bulan?: string; jenis?: string; ok?: string }> }) {
+/** Validasi isian transaksi (port dari validate_tx() di includes/tx_form.php). */
+async function validasiTx(supabase: SupabaseClient, uid: string, fd: FormData): Promise<TxValid | string> {
+  const j = teks(fd, 'jenis')
+  const jenis = (['pemasukan', 'pengeluaran', 'transfer'] as const).find((x) => x === j)
+  const nominal = Math.round(angka(fd, 'nominal') * 100) / 100
+  let keterangan = teks(fd, 'keterangan').slice(0, 150)
+  const tanggal = teks(fd, 'tanggal')
+  const wallet = angka(fd, 'wallet_id')
+  const tujuan = angka(fd, 'wallet_tujuan_id')
+  const kat = angka(fd, 'category_id')
+
+  if (!jenis) return 'Jenis transaksi tidak valid.'
+  if (nominal <= 0) return 'Nominal harus lebih dari 0.'
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal) || Number.isNaN(Date.parse(tanggal))) return 'Tanggal tidak valid.'
+  if (tanggal > hariIni()) return 'Tanggal tidak boleh melebihi hari ini.'
+
+  const { data: wallets } = await supabase.from('wallets').select('id').eq('user_id', uid)
+  const milik = (id: number) => (wallets ?? []).some((w) => w.id === id)
+  if (!milik(wallet)) return 'Wallet tidak valid.'
+
+  if (jenis === 'transfer') {
+    if (!milik(tujuan)) return 'Pilih wallet tujuan.'
+    if (tujuan === wallet) return 'Wallet asal dan tujuan tidak boleh sama.'
+    if (!keterangan) keterangan = 'Transfer antar wallet'
+    return { jenis, nominal, keterangan, tanggal, wallet_id: wallet, wallet_tujuan_id: tujuan, category_id: null }
+  }
+
+  const { data: c } = await supabase.from('categories').select('id').eq('id', kat).eq('jenis', jenis).maybeSingle()
+  if (!c) return 'Pilih kategori yang sesuai.'
+  if (!keterangan) return 'Keterangan wajib diisi.'
+  return { jenis, nominal, keterangan, tanggal, wallet_id: wallet, wallet_tujuan_id: null, category_id: kat }
+}
+
+function segarkan() {
+  revalidatePath('/transaksi')
+  revalidatePath('/beranda')
+}
+
+export async function tambahTransaksi(_prev: Hasil, fd: FormData): Promise<Hasil> {
   const { supabase, profil } = await wajibLogin('mahasiswa')
-  const uid = profil.id
-  const sp = await searchParams
-  const hari = hariIni()
-  const bulan = bulanDariParam(sp.bulan)
-  const [dari, sampai] = rentangBulan(bulan)
-  const jenisAwal = (['pemasukan', 'pengeluaran', 'transfer'] as const).find((j) => j === sp.jenis) ?? 'pengeluaran'
+  const v = await validasiTx(supabase, profil.id, fd)
+  if (typeof v === 'string') return gagal(v)
 
-  const [wallets, kat, list, keluarHariIni] = await Promise.all([
-    ambilWallet(supabase, uid),
-    supabase.from('categories').select('id, nama, jenis, user_id').order('jenis').order('nama'),
-    supabase
-      .from('transactions')
-      .select('id, tanggal, jenis, nominal, keterangan, bukti, kategori:categories(nama), wallet:wallets!transactions_wallet_id_fkey(nama), tujuan:wallets!transactions_wallet_tujuan_id_fkey(nama)')
-      .eq('user_id', uid).gte('tanggal', dari).lt('tanggal', sampai)
-      .order('tanggal', { ascending: false }).order('id', { ascending: false }),
-    supabase.from('transactions').select('nominal').eq('user_id', uid).eq('jenis', 'pengeluaran').eq('tanggal', hari),
-  ])
-  const kategori = (kat.data ?? []) as (OpsiKategori & { user_id: string | null })[]
-  const transaksi = (list.data ?? []) as unknown as Baris[]
-  const totalHariIni = (keluarHariIni.data ?? []).reduce((s, t) => s + Number(t.nominal), 0)
+  let bukti: string | null = null
+  const file = ambilFile(fd)
+  if (file) {
+    const up = await simpanStruk(supabase, profil.id, file)
+    if (up.error) return gagal(up.error)
+    bukti = up.path!
+  }
 
-  return (
-    <>
-      <div><p className="text-xs text-slate-500">Catat pemasukan, pengeluaran, dan transfer antar wallet.</p></div>
-      {sp.ok === 'ubah' && <Flash hasil={{ ok: 'Transaksi diperbarui.' }} />}
+  const { error } = await supabase.from('transactions').insert({ ...v, user_id: profil.id, bukti })
+  if (error) {
+    await hapusStruk(supabase, bukti)
+    return gagal('Transaksi gagal disimpan: ' + error.message)
+  }
+  segarkan()
+  return sukses('Transaksi tersimpan.')
+}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <TxForm aksi={tambahTransaksi} wallets={wallets} kategori={kategori} awal={{ jenis: jenisAwal, wallet_id: wallets[0]?.id }} mode="baru" />
+/** Hasil simpan dari Scan Struk. id dipakai untuk tautan "Ubah" dan pratinjau foto. */
+export type HasilScan = { ok?: string; error?: string; id?: number }
 
-          <div className="hs-card p-5 space-y-3">
-            <div className="flex flex-wrap justify-between items-center gap-2">
-              <h4 className="text-sm font-black">Riwayat Transaksi</h4>
-              <div className="flex items-center gap-2">
-                <form method="get">
-                  {/* ganti bulan: halaman dimuat ulang dengan ?bulan=YYYY-MM */}
-                  <input type="month" name="bulan" defaultValue={bulan} aria-label="Pilih bulan" className="px-3 py-1.5 text-xs border" />
-                  <button className="hs-btn bg-hsYellow text-hsDark px-3 py-1.5 text-xs ml-1">Lihat</button>
-                </form>
-                <a href={`/transaksi/export?bulan=${bulan}`} className="hs-btn bg-slate-800 text-white px-3 py-1.5 text-xs" title="Unduh CSV (bisa dibuka di Excel)">
-                  <Download size={13} /> CSV
-                </a>
-              </div>
-            </div>
-            {transaksi.length === 0 && <p className="text-xs text-slate-500">Belum ada transaksi di bulan ini.</p>}
-            {transaksi.map((t) => (
-              <div key={t.id} className="fc-tx">
-                <span className={`fc-tx-icon ${KELAS[t.jenis]}`}>{kategoriEmoji(t.kategori?.nama, t.jenis)}</span>
-                <div className="text-sm min-w-0 flex-1">
-                  <p className="font-bold truncate">{t.keterangan}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    <span className="fc-chip">{t.jenis === 'transfer' ? `${t.wallet?.nama} ke ${t.tujuan?.nama}` : t.kategori?.nama ?? 'Lainnya'}</span>{' '}
-                    {tgl(t.tanggal)}{t.jenis !== 'transfer' && ` · ${t.wallet?.nama}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <p className={`font-display font-extrabold text-base ${WARNA[t.jenis]}`}>{TANDA[t.jenis]}{rupiah(t.nominal)}</p>
-                  {t.bukti && (
-                    <a href={`/transaksi/struk/${t.id}`} target="_blank" rel="noopener" className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 text-xs flex items-center justify-center" title="Lihat foto struk" aria-label="Lihat foto struk">
-                      <ReceiptText size={14} />
-                    </a>
-                  )}
-                  <Link href={`/transaksi/${t.id}/ubah`} className="w-8 h-8 rounded-full bg-slate-100 text-xs flex items-center justify-center" title="Ubah" aria-label="Ubah transaksi">
-                    <Pencil size={13} />
-                  </Link>
-                  <TombolHapus aksi={hapusTransaksi} id={t.id} pesan="Hapus transaksi ini?" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+/**
+ * Simpan pengeluaran hasil scan struk. Teks struk dibaca di browser (tesseract.js);
+ * server tetap memvalidasi ulang semuanya lewat validasiTx() dan menyimpan fotonya sebagai bukti.
+ */
+export async function simpanDariScan(fd: FormData): Promise<HasilScan> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  fd.set('jenis', 'pengeluaran')
+  const v = await validasiTx(supabase, profil.id, fd)
+  if (typeof v === 'string') return { error: v }
 
-        <div className="space-y-6">
-          <BatasHarianForm batas={profil.batas_harian} hariIni={totalHariIni} />
-          <KategoriSaya kategori={kategori.filter((k) => k.user_id === uid)} />
-        </div>
-      </div>
-    </>
-  )
+  let bukti: string | null = null
+  const file = ambilFile(fd)
+  if (file) {
+    const up = await simpanStruk(supabase, profil.id, file)
+    if (up.error) return { error: up.error }
+    bukti = up.path!
+  }
+
+  const { data, error } = await supabase.from('transactions').insert({ ...v, user_id: profil.id, bukti }).select('id').single()
+  if (error || !data) {
+    await hapusStruk(supabase, bukti)
+    return { error: 'Transaksi gagal disimpan: ' + (error?.message ?? 'coba lagi.') }
+  }
+  segarkan()
+  return { ok: 'Struk tersimpan sebagai pengeluaran.', id: Number(data.id) }
+}
+
+export async function ubahTransaksi(id: number, _prev: Hasil, fd: FormData): Promise<Hasil> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  const { data: lama } = await supabase.from('transactions').select('id, bukti').eq('id', id).eq('user_id', profil.id).maybeSingle()
+  if (!lama) return gagal('Transaksi tidak ditemukan.')
+
+  const v = await validasiTx(supabase, profil.id, fd)
+  if (typeof v === 'string') return gagal(v)
+
+  // foto baru menggantikan foto lama; centang "hapus" menghapus foto tanpa pengganti
+  let bukti: string | null = lama.bukti
+  const file = ambilFile(fd)
+  if (file) {
+    const up = await simpanStruk(supabase, profil.id, file)
+    if (up.error) return gagal(up.error)
+    bukti = up.path!
+  } else if (teks(fd, 'hapus_bukti')) {
+    bukti = null
+  }
+
+  const { error } = await supabase.from('transactions').update({ ...v, bukti }).eq('id', id).eq('user_id', profil.id)
+  if (error) return gagal('Transaksi gagal disimpan: ' + error.message)
+  if (bukti !== lama.bukti) await hapusStruk(supabase, lama.bukti)
+
+  segarkan()
+  redirect('/transaksi?ok=ubah')
+}
+
+export async function hapusTransaksi(_prev: Hasil, fd: FormData): Promise<Hasil> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  const id = angka(fd, 'id')
+  const { data } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', profil.id).select('bukti').maybeSingle()
+  if (!data) return gagal('Transaksi tidak ditemukan.')
+  await hapusStruk(supabase, data.bukti)
+  segarkan()
+  return sukses('Transaksi dihapus.')
+}
+
+export async function simpanBatasHarian(_prev: Hasil, fd: FormData): Promise<Hasil> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  const batas = Math.max(0, angka(fd, 'batas_harian'))
+  const { error } = await supabase.from('profiles').update({ batas_harian: batas }).eq('id', profil.id)
+  if (error) return gagal('Gagal menyimpan: ' + error.message)
+  segarkan()
+  revalidatePath('/pencapaian')
+  revalidatePath('/petualangan')
+  return sukses('Batas harian diperbarui.')
+}
+
+export async function tambahKategori(_prev: Hasil, fd: FormData): Promise<Hasil> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  const nama = teks(fd, 'nama').slice(0, 50)
+  const jenis = teks(fd, 'jenis') === 'pemasukan' ? 'pemasukan' : 'pengeluaran'
+  if (!nama) return gagal('Nama kategori wajib diisi.')
+  const { error } = await supabase.from('categories').insert({ user_id: profil.id, nama, jenis })
+  if (error) return gagal('Gagal menyimpan: ' + error.message)
+  revalidatePath('/transaksi')
+  return sukses('Kategori ditambahkan.')
+}
+
+export async function hapusKategori(_prev: Hasil, fd: FormData): Promise<Hasil> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  await supabase.from('categories').delete().eq('id', angka(fd, 'id')).eq('user_id', profil.id)
+  revalidatePath('/transaksi')
+  return sukses('Kategori dihapus.')
 }
