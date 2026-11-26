@@ -10,22 +10,55 @@ import type { Forecast } from './forecast.ts'
 
 export type Intent = 'saldo' | 'habis' | 'tips' | 'burn' | 'utang' | 'badge' | 'transfer' | 'struk' | 'catat' | 'sapa' | 'tidak_paham'
 
-/** Urutan pengecekan sama dengan versi PHP: yang lebih atas didahulukan. */
-export function deteksiIntent(teks: string): Intent {
-  const q = teks.toLowerCase()
-  const ada = (...kata: string[]) => kata.some((k) => q.includes(k))
+/**
+ * Daftar kata kunci per intent. Urutan = prioritas (yang atas didahulukan, sama seperti versi PHP).
+ * "lemah" = intent umum yang kalah kalau ada intent lain yang cocok (mis. "cara hemat" -> tips, bukan catat).
+ */
+const ATURAN: { intent: Intent; kata: string[]; lemah?: boolean }[] = [
+  { intent: 'saldo', kata: ['saldo', 'uang aku', 'uangku', 'duit'] },
+  { intent: 'habis', kata: ['habis', 'kapan', 'runway', 'cukup', 'aman'] },
+  { intent: 'tips', kata: ['hemat', 'tips', 'saran', 'boros', 'kategori', 'paling banyak'] },
+  { intent: 'burn', kata: ['burn', 'rata-rata', 'per hari', 'harian'] },
+  { intent: 'utang', kata: ['utang', 'piutang', 'pinjam', 'nagih', 'patungan'] },
+  { intent: 'badge', kata: ['badge', 'level', 'poin', 'streak', 'pencapaian'] },
+  { intent: 'transfer', kata: ['transfer', 'wallet', 'dompet', 'gopay', 'bca', 'e-wallet'] },
+  { intent: 'struk', kata: ['struk', 'foto', 'bukti'] },
+  { intent: 'catat', kata: ['catat', 'tambah', 'input', 'cara'], lemah: true },
+  { intent: 'sapa', kata: ['halo', 'hai', 'hi', 'pagi', 'siang', 'malam'], lemah: true },
+]
 
-  if (ada('saldo', 'uang aku', 'uangku', 'duit') && !ada('habis', 'kapan', 'cukup')) return 'saldo'
-  if (ada('habis', 'kapan', 'runway', 'cukup', 'aman')) return 'habis'
-  if (ada('hemat', 'tips', 'saran', 'boros', 'kategori', 'paling banyak')) return 'tips'
-  if (ada('burn', 'rata-rata', 'per hari', 'harian')) return 'burn'
-  if (ada('utang', 'piutang', 'pinjam', 'nagih', 'patungan')) return 'utang'
-  if (ada('badge', 'level', 'poin', 'streak', 'pencapaian')) return 'badge'
-  if (ada('transfer', 'wallet', 'dompet', 'gopay', 'bca', 'e-wallet')) return 'transfer'
-  if (ada('struk', 'foto', 'bukti')) return 'struk'
-  if (ada('catat', 'tambah', 'input', 'cara')) return 'catat'
-  if (ada('halo', 'hai', 'hi', 'pagi', 'siang', 'malam')) return 'sapa'
-  return 'tidak_paham'
+/**
+ * Cocok per KATA, bukan per potongan huruf:
+ * - kata pendek (maks. 3 huruf, mis. "hi", "bca") harus sama persis -> "hiburan" tidak lagi dianggap "hi"
+ * - kata lain boleh diikuti imbuhan -> "uangku", "utangku", "dihemat" tetap dikenali
+ */
+function cocokKata(q: string, kata: string): boolean {
+  const k = kata.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = kata.length <= 3 ? new RegExp(`(^|[^a-z0-9])${k}($|[^a-z0-9])`) : new RegExp(`(^|[^a-z0-9])${k}`)
+  return re.test(q)
+}
+
+/** Semua intent yang cocok, urut prioritas. Kosong = tidak ada yang cocok. */
+export function semuaIntent(teks: string): Intent[] {
+  const q = teks.toLowerCase()
+  const ada = (kata: string[]) => kata.some((k) => cocokKata(q, k))
+  const hasil: { intent: Intent; lemah: boolean }[] = []
+
+  for (const a of ATURAN) {
+    if (!ada(a.kata)) continue
+    // "saldo cukup gak?" itu pertanyaan prediksi, bukan cek saldo (aturan lama tetap dipakai)
+    if (a.intent === 'saldo' && ada(['habis', 'kapan', 'cukup'])) continue
+    // sapaan hanya untuk pesan pendek ("pengeluaran malam hari" bukan sapaan)
+    if (a.intent === 'sapa' && q.trim().split(/\s+/).length > 4) continue
+    hasil.push({ intent: a.intent, lemah: !!a.lemah })
+  }
+  const kuat = hasil.filter((h) => !h.lemah)
+  return (kuat.length ? kuat : hasil).map((h) => h.intent)
+}
+
+/** Intent utama (yang paling atas). Dipakai kalau chatbot menjawab dengan aturan. */
+export function deteksiIntent(teks: string): Intent {
+  return semuaIntent(teks)[0] ?? 'tidak_paham'
 }
 
 /** Data yang dipakai untuk menjawab. Hanya bagian yang dibutuhkan intent yang diisi. */
@@ -37,6 +70,14 @@ export type DataBot = {
   kategoriTeratas?: { kategori: string; total: number; totalKeluar: number } | null
   utang?: { piutangTotal: number; piutangN: number; utangTotal: number; utangN: number }
   gamify?: { level: number; levelNama: string; poin: number; streak: number; badgeDapat: number; badgeTotal: number }
+  /** hanya diisi untuk jawaban AI: perbandingan bulan ini vs bulan lalu */
+  bulanan?: {
+    masuk: number
+    keluar: number
+    keluarBulanLalu: number
+    perKategori: { kategori: string; total: number }[]
+    perKategoriBulanLalu: { kategori: string; total: number }[]
+  }
 }
 
 const TIPS: Record<string, string> = {
@@ -105,3 +146,6 @@ export function kebutuhanData(intent: Intent) {
     gamify: intent === 'badge',
   }
 }
+
+/** Untuk jawaban AI: ambil semua data sekaligus supaya pertanyaan bebas bisa dijawab. */
+export const SEMUA_DATA = { forecast: true, wallets: true, laporan: true, utang: true, gamify: true }
