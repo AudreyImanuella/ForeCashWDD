@@ -6,6 +6,7 @@ import AvatarPicker from '@/components/AvatarPicker'
 import Flash from '@/components/Flash'
 import { useAksi } from '@/lib/useAksi'
 import { buatKodeBaru, cabutAkses, gantiPassword, simpanProfil } from '../actions'
+import InputSandi from '@/components/form/InputSandi'
 
 export function FormProfil({ nama, email, avatar, role }: { nama: string; email: string; avatar: string; role: string }) {
   const { hasil, pending, onSubmit } = useAksi(simpanProfil, { resetOk: false })
@@ -30,11 +31,11 @@ export function FormPassword({ punyaSandi }: { punyaSandi: boolean }) {
       <h4 className="text-sm font-black border-b pb-2">{punyaSandi ? 'Ganti Kata Sandi' : 'Buat Kata Sandi'}</h4>
       <Flash hasil={hasil} />
       {punyaSandi ? (
-        <input type="password" name="lama" required placeholder="Kata sandi lama" aria-label="Kata sandi lama" autoComplete="current-password" className="w-full px-3 py-2 text-xs border" />
+        <InputSandi name="lama" required placeholder="Kata sandi lama" aria-label="Kata sandi lama" autoComplete="current-password" className="w-full px-3 py-2 text-xs border" />
       ) : (
         <p className="text-[11px] text-slate-500">Akunmu masuk lewat Google. Buat kata sandi supaya bisa login dengan email juga.</p>
       )}
-      <input type="password" name="baru" required minLength={8} placeholder="Kata sandi baru (min. 8)" aria-label="Kata sandi baru" autoComplete="new-password" className="w-full px-3 py-2 text-xs border" />
+      <InputSandi name="baru" required minLength={8} placeholder="Kata sandi baru (min. 8)" aria-label="Kata sandi baru" autoComplete="new-password" className="w-full px-3 py-2 text-xs border" />
       <button disabled={pending} className="hs-btn bg-slate-800 text-white w-full py-2 text-xs disabled:opacity-60">{punyaSandi ? 'Ganti' : 'Simpan'}</button>
     </form>
   )

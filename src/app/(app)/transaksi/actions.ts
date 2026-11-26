@@ -75,6 +75,36 @@ export async function tambahTransaksi(_prev: Hasil, fd: FormData): Promise<Hasil
   return sukses('Transaksi tersimpan.')
 }
 
+/** Hasil simpan dari Scan Struk. id dipakai untuk tautan "Ubah" dan pratinjau foto. */
+export type HasilScan = { ok?: string; error?: string; id?: number }
+
+/**
+ * Simpan pengeluaran hasil scan struk. Teks struk dibaca di browser (tesseract.js);
+ * server tetap memvalidasi ulang semuanya lewat validasiTx() dan menyimpan fotonya sebagai bukti.
+ */
+export async function simpanDariScan(fd: FormData): Promise<HasilScan> {
+  const { supabase, profil } = await wajibLogin('mahasiswa')
+  fd.set('jenis', 'pengeluaran')
+  const v = await validasiTx(supabase, profil.id, fd)
+  if (typeof v === 'string') return { error: v }
+
+  let bukti: string | null = null
+  const file = ambilFile(fd)
+  if (file) {
+    const up = await simpanStruk(supabase, profil.id, file)
+    if (up.error) return { error: up.error }
+    bukti = up.path!
+  }
+
+  const { data, error } = await supabase.from('transactions').insert({ ...v, user_id: profil.id, bukti }).select('id').single()
+  if (error || !data) {
+    await hapusStruk(supabase, bukti)
+    return { error: 'Transaksi gagal disimpan: ' + (error?.message ?? 'coba lagi.') }
+  }
+  segarkan()
+  return { ok: 'Struk tersimpan sebagai pengeluaran.', id: Number(data.id) }
+}
+
 export async function ubahTransaksi(id: number, _prev: Hasil, fd: FormData): Promise<Hasil> {
   const { supabase, profil } = await wajibLogin('mahasiswa')
   const { data: lama } = await supabase.from('transactions').select('id, bukti').eq('id', id).eq('user_id', profil.id).maybeSingle()

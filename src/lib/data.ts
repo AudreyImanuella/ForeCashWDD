@@ -25,12 +25,13 @@ export async function ambilForecast(supabase: SupabaseClient, uid: string, walle
   const hari = hariIni()
   const dari = tambahHari(hari, -14) // burn rate maksimal 14 hari
 
-  const [w, pertama, keluar, jadwal] = await Promise.all([
+  const [w, pertama, keluar, jadwal, rencana] = await Promise.all([
     wallets ? Promise.resolve(wallets) : ambilWallet(supabase, uid),
     supabase.from('transactions').select('tanggal').eq('user_id', uid).eq('jenis', 'pengeluaran')
       .order('tanggal', { ascending: true }).limit(1).maybeSingle(),
     supabase.from('transactions').select('tanggal, nominal').eq('user_id', uid).eq('jenis', 'pengeluaran').gt('tanggal', dari),
     supabase.from('income_schedules').select('id, sumber, nominal, tanggal_perkiraan, status').eq('user_id', uid).eq('status', 'menunggu'),
+    supabase.from('rencana_pengeluaran').select('tanggal, nominal').eq('user_id', uid).eq('status', 'rencana'),
   ])
   if (pertama.error) throw pertama.error
   if (keluar.error) throw keluar.error
@@ -42,6 +43,8 @@ export async function ambilForecast(supabase: SupabaseClient, uid: string, walle
     pengeluaranPertama: pertama.data?.tanggal ?? null,
     pengeluaran: (keluar.data ?? []).map((p) => ({ tanggal: p.tanggal, nominal: Number(p.nominal) })),
     jadwal: (jadwal.data ?? []).map((j) => ({ ...j, nominal: Number(j.nominal) }) as JadwalPemasukan),
+    // tabel rencana belum ada (migrasi 000006 belum dijalankan) -> dianggap tidak ada rencana
+    rencana: (rencana.data ?? []).map((r) => ({ tanggal: r.tanggal, nominal: Number(r.nominal) })),
   })
 }
 

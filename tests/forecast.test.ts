@@ -117,3 +117,38 @@ test('proyeksi saldo harian tidak pernah minus', () => {
   assert.equal(p[0].tanggal, HARI)
   assert.equal(p.length, 5)
 })
+
+// ---------- fitur Rencana ----------
+test('rencana: tanpa rencana hasilnya sama persis (rencanaDulu = 0)', () => {
+  const a = forecast({ hariIni: '2026-11-18', saldo: 575000, pengeluaranPertama: '2026-10-01', pengeluaran: [{ tanggal: '2026-11-17', nominal: 140000 }], jadwal: [{ id: 1, sumber: 'Uang saku', nominal: 1000000, tanggal_perkiraan: '2026-12-01', status: 'menunggu' }] })
+  const b = forecast({ hariIni: '2026-11-18', saldo: 575000, pengeluaranPertama: '2026-10-01', pengeluaran: [{ tanggal: '2026-11-17', nominal: 140000 }], jadwal: [{ id: 1, sumber: 'Uang saku', nominal: 1000000, tanggal_perkiraan: '2026-12-01', status: 'menunggu' }], rencana: [] })
+  assert.deepEqual(a, b)
+  assert.equal(a.rencanaDulu, 0)
+})
+
+test('rencana: yang jatuh sebelum kiriman dipotong dari saldo bebas', () => {
+  const f = forecast({
+    hariIni: '2026-11-18', saldo: 500000, pengeluaranPertama: '2026-10-01',
+    pengeluaran: [{ tanggal: '2026-11-17', nominal: 140000 }], // burn 10.000/hari
+    jadwal: [{ id: 1, sumber: 'Uang saku', nominal: 1000000, tanggal_perkiraan: '2026-11-28', status: 'menunggu' }],
+    rencana: [{ tanggal: '2026-11-20', nominal: 200000 }, { tanggal: '2026-11-15', nominal: 50000 }, { tanggal: '2026-12-05', nominal: 900000 }],
+  })
+  assert.equal(f.rencanaDulu, 250000) // yang terlambat ikut, yang setelah kiriman tidak
+  assert.equal(f.runway, 25) // (500.000 - 250.000) / 10.000
+  assert.equal(f.batasAman, 25000) // 250.000 / 10 hari
+  assert.equal(f.status, 'aman')
+})
+
+test('rencana: kalau rencana menghabiskan saldo, status kritis', () => {
+  const f = forecast({
+    hariIni: '2026-11-18', saldo: 300000, pengeluaranPertama: null, pengeluaran: [],
+    jadwal: [], rencana: [{ tanggal: '2026-11-25', nominal: 400000 }],
+  })
+  assert.equal(f.rencanaDulu, 400000)
+  assert.equal(f.status, 'kritis')
+})
+
+test('proyeksi: rencana dipotong pada tanggalnya', () => {
+  const p = proyeksi({ saldo: 100000, burn: 1000 }, '2026-11-18', 3, [{ tanggal: '2026-11-20', nominal: 50000 }])
+  assert.deepEqual(p.map((x) => x.saldo), [100000, 99000, 48000, 47000])
+})

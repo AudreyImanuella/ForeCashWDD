@@ -28,7 +28,11 @@ export type ForecastInput = {
   pengeluaran: { tanggal: string; nominal: number }[]
   /** jadwal pemasukan */
   jadwal: JadwalPemasukan[]
+  /** rencana pengeluaran yang belum dibayar (fitur Rencana). Kosong = sama persis dengan versi PHP. */
+  rencana?: RencanaBayar[]
 }
+
+export type RencanaBayar = { tanggal: string; nominal: number }
 
 export type Forecast = {
   saldo: number
@@ -48,8 +52,13 @@ export type Forecast = {
   batasAman: number | null
   /** pemasukan yang sudah lewat tanggalnya tapi belum diterima */
   terlambat: JadwalPemasukan[]
+  /** total rencana pengeluaran yang jatuh sebelum pemasukan berikutnya (sudah dipotong dari saldo bebas) */
+  rencanaDulu: number
   status: Status
 }
+
+/** Hari ke depan yang dipakai untuk rencana kalau belum ada jadwal pemasukan. */
+export const HARI_RENCANA_TANPA_JADWAL = 30
 
 export const HARI_BURN_MAKS = 14
 export const HARI_BURN_MIN = 3
@@ -69,34 +78,45 @@ export function forecast(input: ForecastInput): Forecast {
   const keluar = pengeluaran.filter((p) => p.tanggal > batasBawah).reduce((s, p) => s + Number(p.nominal), 0)
   const burn = keluar / hari
 
-  const runway = burn > 0 ? Math.floor(Math.max(0, saldo) / burn) : null
-  const habis = runway !== null ? tambahHari(hariIni, runway) : null
-
   const menunggu = jadwal
     .filter((j) => j.status === 'menunggu')
     .sort((a, b) => a.tanggal_perkiraan.localeCompare(b.tanggal_perkiraan) || a.id - b.id)
   const next = menunggu.find((j) => j.tanggal_perkiraan >= hariIni) ?? null
   const terlambat = menunggu.filter((j) => j.tanggal_perkiraan < hariIni)
 
+  // rencana pengeluaran yang harus dibayar sebelum uang berikutnya datang (termasuk yang sudah lewat
+  // tanggalnya tapi belum dibayar) mengurangi saldo yang bebas dipakai untuk jajan harian
+  const batasRencana = next ? next.tanggal_perkiraan : tambahHari(hariIni, HARI_RENCANA_TANPA_JADWAL)
+  const rencanaDulu = (input.rencana ?? [])
+    .filter((r) => r.tanggal < batasRencana)
+    .reduce((s, r) => s + Number(r.nominal), 0)
+  const saldoBebas = saldo - rencanaDulu
+
+  const runway = burn > 0 ? Math.floor(Math.max(0, saldoBebas) / burn) : null
+  const habis = runway !== null ? tambahHari(hariIni, runway) : null
+
   const sisaHari = next ? selisihHari(hariIni, next.tanggal_perkiraan) : null
-  const batasAman = next && sisaHari !== null && sisaHari > 0 ? Math.max(0, saldo) / sisaHari : null
+  const batasAman = next && sisaHari !== null && sisaHari > 0 ? Math.max(0, saldoBebas) / sisaHari : null
 
   // status: aman / waspada (kurang 1–3 hari) / kritis (kurang > 3 hari atau saldo habis)
   let status: Status = 'aman'
-  if (saldo <= 0) status = 'kritis'
+  if (saldo <= 0 || (rencanaDulu > 0 && saldoBebas <= 0)) status = 'kritis'
   else if (runway !== null && sisaHari !== null && runway < sisaHari) {
     status = sisaHari - runway > 3 ? 'kritis' : 'waspada'
   }
   if (status === 'aman' && terlambat.length > 0) status = 'waspada'
 
-  return { saldo, burn, hari, runway, habis, next, sisaHari, batasAman, terlambat, status }
+  return { saldo, burn, hari, runway, habis, next, sisaHari, batasAman, terlambat, rencanaDulu, status }
 }
 
-/** Proyeksi saldo harian untuk grafik (default 30 hari ke depan). */
-export function proyeksi(f: Pick<Forecast, 'saldo' | 'burn'>, hariIni: string, days = 30) {
+/** Proyeksi saldo harian untuk grafik (default 30 hari ke depan).
+ *  Rencana pengeluaran dipotong pada tanggalnya (yang sudah lewat dipotong hari ini). */
+export function proyeksi(f: Pick<Forecast, 'saldo' | 'burn'>, hariIni: string, days = 30, rencana: RencanaBayar[] = []) {
   const hasil: { tanggal: string; saldo: number }[] = []
   for (let i = 0; i <= days; i++) {
-    hasil.push({ tanggal: tambahHari(hariIni, i), saldo: Math.round(Math.max(0, f.saldo - f.burn * i)) })
+    const tanggal = tambahHari(hariIni, i)
+    const dibayar = rencana.filter((r) => r.tanggal <= tanggal).reduce((s, r) => s + Number(r.nominal), 0)
+    hasil.push({ tanggal, saldo: Math.round(Math.max(0, f.saldo - dibayar - f.burn * i)) })
   }
   return hasil
 }

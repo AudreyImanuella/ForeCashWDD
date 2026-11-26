@@ -7,9 +7,10 @@ import Link from 'next/link'
 import Flash from '@/components/Flash'
 import type { Hasil } from '@/lib/aksi'
 import type { Jenis } from '@/lib/data'
-import { rupiah } from '@/lib/format'
+import { bacaNominal, rupiah } from '@/lib/format'
 import { hariIni } from '@/lib/tanggal'
 import { useAksi } from '@/lib/useAksi'
+import InputRupiah from '@/components/form/InputRupiah'
 
 export type OpsiWallet = { id: number; nama: string; saldo: number }
 export type OpsiKategori = { id: number; nama: string; jenis: 'pemasukan' | 'pengeluaran' }
@@ -22,7 +23,7 @@ export type NilaiTx = {
 export const BATAS_KONFIRMASI = 5_000_000
 export function konfirmasiNominal(form: HTMLFormElement, field = 'nominal'): boolean {
   const input = form.elements.namedItem(field) as HTMLInputElement | null
-  const n = input ? Number(input.value) : 0
+  const n = input ? bacaNominal(input.value) || 0 : 0
   if (n >= BATAS_KONFIRMASI && !confirm(`Yakin nominalnya ${rupiah(n)}?\n\nPeriksa lagi jumlah angka nol sebelum menyimpan.`)) {
     input?.focus()
     return false
@@ -60,7 +61,7 @@ export default function TxForm({ aksi, wallets, kategori, awal, mode }: Props) {
         </div>
         <div>
           <label htmlFor="nominal" className="text-xs font-bold">Nominal (Rp)</label>
-          <input id="nominal" type="number" name="nominal" min="1" step="1" required defaultValue={awal.nominal ?? ''} placeholder="25000" className="w-full px-3 py-2.5 text-sm border" />
+          <InputRupiah id="nominal" name="nominal" required size="md" defaultValue={awal.nominal} placeholder="25.000" />
         </div>
       </div>
 

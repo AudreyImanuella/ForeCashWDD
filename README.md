@@ -105,17 +105,19 @@ Buka http://localhost:3000.
    3. `supabase/migrations/20261113000003_storage.sql`: bucket privat foto struk
    4. `supabase/migrations/20261113000004_email_kritis.sql`: email Kritis maks. sekali sehari
    5. `supabase/migrations/20261113000005_orangtua.sql`: daftar orang tua yang terhubung
+   6. `supabase/migrations/20261118000006_rencana_teman.sql`: fitur Rencana (anggaran, target tabungan, rencana pengeluaran) dan Teman ForeCash (kode teman, tagihan split bill antar-akun)
 4. **Pengaturan login** (menu **Authentication**):
    - **URL Configuration**: Site URL `http://localhost:3000`, Redirect URLs tambahkan `http://localhost:3000/**`.
    - **Sign In / Providers → Email**: matikan **Confirm email** agar akun baru bisa langsung dipakai saat demo (email bawaan Supabase dibatasi beberapa email per jam).
 5. **Data demo (opsional):**
-   1. **Authentication → Users → Add user**: buat `demo@forecash.id` dan `ortu@forecash.id`, kata sandi `demo12345`, centang **Auto Confirm User**.
+   1. **Authentication → Users → Add user**: buat `demo@forecash.id`, `ortu@forecash.id`, dan `teman@forecash.id` (teman ForeCash untuk demo split bill), kata sandi `demo12345`, centang **Auto Confirm User**.
    2. Jalankan `supabase/seed.sql` di SQL Editor. File ini aman dijalankan ulang; tanggal transaksi selalu dihitung mundur dari hari ini.
 
 | Akun demo | Email | Kata sandi |
 |---|---|---|
 | Mahasiswa | demo@forecash.id | demo12345 |
 | Orang tua | ortu@forecash.id | demo12345 |
+| Teman (Andi, kode `ANDI26`) | teman@forecash.id | demo12345 |
 
 ### Login dengan Google (opsional)
 

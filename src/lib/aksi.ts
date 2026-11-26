@@ -1,5 +1,6 @@
 // Hasil dari Server Action: pesan sukses (ok) atau pesan error.
 // Pengganti flash() di versi PHP.
+import { bacaNominal } from '@/lib/format'
 export type Hasil = { ok?: string; error?: string } | null
 
 export const gagal = (error: string): Hasil => ({ error })
@@ -13,6 +14,6 @@ export function teks(fd: FormData, nama: string): string {
 
 /** Ambil angka dari FormData (0 kalau kosong / tidak valid). */
 export function angka(fd: FormData, nama: string): number {
-  const n = Number(teks(fd, nama))
+  const n = bacaNominal(teks(fd, nama))
   return Number.isFinite(n) ? n : 0
 }

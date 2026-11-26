@@ -1,4 +1,4 @@
-import { House, Receipt, Users, CloudSun, ChartPie, MapPinned, Trophy, Eye, type LucideIcon } from 'lucide-react'
+import { House, Receipt, Users, ClipboardList, CloudSun, ChartPie, MapPinned, Trophy, Eye, type LucideIcon } from 'lucide-react'
 
 export type Warna = 'orange' | 'blue' | 'purple' | 'green' | 'pink' | 'teal' | 'yellow' | 'red'
 
@@ -16,6 +16,7 @@ export const MENU_MAHASISWA: MenuItem[] = [
   { href: '/beranda', label: 'Beranda', pendek: 'Beranda', icon: House, warna: 'orange' },
   { href: '/transaksi', label: 'Transaksi', pendek: 'Transaksi', icon: Receipt, warna: 'blue' },
   { href: '/utang', label: 'Utang & Patungan', pendek: 'Utang', icon: Users, warna: 'purple' },
+  { href: '/rencana', label: 'Rencana', pendek: 'Rencana', icon: ClipboardList, warna: 'teal' },
   { href: '/prediksi', label: 'Prediksi', pendek: 'Prediksi', icon: CloudSun, warna: 'green' },
   { href: '/laporan', label: 'Laporan', pendek: 'Laporan', icon: ChartPie, warna: 'pink' },
   { href: '/petualangan', label: 'Petualangan', pendek: 'Peta', icon: MapPinned, warna: 'teal' },
@@ -32,6 +33,7 @@ export const JUDUL_HALAMAN: Record<string, string> = {
   '/transaksi': 'Transaksi',
   '/wallet': 'Kelola Wallet',
   '/utang': 'Utang & Patungan',
+  '/rencana': 'Rencana',
   '/prediksi': 'Prediksi & Notifikasi',
   '/laporan': 'Laporan Bulanan',
   '/petualangan': 'Petualangan',

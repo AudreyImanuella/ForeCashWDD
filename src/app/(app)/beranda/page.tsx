@@ -1,11 +1,14 @@
 // Beranda mahasiswa (port dari php-version/pages/dashboard.php).
 import Link from 'next/link'
 import { after } from 'next/server'
-import { Coins, Flame, HandCoins, UserRoundMinus, Banknote, Landmark, Smartphone } from 'lucide-react'
+import { Coins, Flame, HandCoins, UserRoundMinus, Banknote, Landmark, Smartphone, ClipboardList, Target, BellRing } from 'lucide-react'
 import WarningBanner from '@/components/WarningBanner'
 import PetSvg from '@/components/PetSvg'
 import { PETS } from '@/lib/pets'
-import { LevelBar, Tantangan } from '@/components/Gamifikasi'
+import { LevelBar, Tantangan, sisaBadge } from '@/components/Gamifikasi'
+import BadgeIkon from '@/components/BadgeIkon'
+import BadgeBaru from '@/components/BadgeBaru'
+import { TINGKAT } from '@/lib/gamify'
 import { wajibLogin } from '@/lib/auth'
 import { ambilForecast, ambilPetDipakai, ambilWallet, kategoriEmoji, type Jenis } from '@/lib/data'
 import { emailStatusKritis } from '@/lib/email'
@@ -41,8 +44,17 @@ export default async function BerandaPage() {
       .limit(5),
     supabase.from('debts').select('arah, nominal').eq('user_id', uid).eq('status', 'belum'),
   ])
+  // fitur Rencana & Teman (kosong kalau migrasi 000006 belum dijalankan)
+  const [rencanaRes, targetRes, tagihanRes] = await Promise.all([
+    supabase.from('rencana_pengeluaran').select('nama, nominal, tanggal').eq('user_id', uid).eq('status', 'rencana').order('tanggal').limit(1).maybeSingle(),
+    supabase.from('target_tabungan').select('nama, target, terkumpul').eq('user_id', uid).is('tercapai_pada', null).order('created_at').limit(1).maybeSingle(),
+    supabase.from('debts').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('arah', 'utang').eq('status', 'belum').not('teman_id', 'is', null),
+  ])
+  const rencanaDekat = rencanaRes.data
+  const targetAktif = targetRes.data
+  const tagihanTeman = tagihanRes.error ? 0 : tagihanRes.count ?? 0
   const g = await ambilGamify(supabase, uid, profil.batas_harian, f.status)
-  const badgeDapat = g.badges.filter((b) => b.dapat)
+  const badgeDapat = g.badges.filter((b) => b.dapat).sort((a, b) => b.tingkat - a.tingkat)
   const transaksi = (recent.data ?? []) as unknown as TxTerakhir[]
   const total = (arah: string) => (debts.data ?? []).filter((d) => d.arah === arah).reduce((s, d) => s + Number(d.nominal), 0)
   const piutang = total('piutang')
@@ -60,6 +72,12 @@ export default async function BerandaPage() {
 
   return (
     <>
+      <BadgeBaru uid={uid} badges={g.badges.map((b) => ({ key: b.key, nama: b.nama, tingkat: b.tingkat }))} />
+      {tagihanTeman > 0 && (
+        <Link href="/utang" className="fc-flash" style={{ background: '#E8F1FF', color: '#1E4FA8', borderColor: '#C7DBFF' }}>
+          <BellRing size={18} /> Ada {tagihanTeman} tagihan dari teman ForeCash yang belum lunas. Lihat di Utang &amp; Patungan.
+        </Link>
+      )}
       <WarningBanner
         f={f}
         avatarId={profil.avatar}
@@ -94,6 +112,32 @@ export default async function BerandaPage() {
         </Link>
       </section>
 
+      {/* Rencana terdekat & target tabungan */}
+      {(rencanaDekat || targetAktif) && (
+        <section className="fc-stats" aria-label="Rencana" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+          {rencanaDekat && (
+            <Link href="/rencana" className="hs-card fc-stat">
+              <span className="fc-tile fc-tile-teal"><ClipboardList size={20} /></span>
+              <div className="min-w-0">
+                <p className="fc-stat-label">Rencana terdekat · {tgl(rencanaDekat.tanggal)}</p>
+                <p className="fc-stat-value" style={{ fontSize: 18 }}>{rencanaDekat.nama} {rupiah(rencanaDekat.nominal)}</p>
+                <p className="fc-stat-sub">{f.rencanaDulu > 0 ? 'Sudah dihitung di prediksi' : 'Jatuh setelah pemasukan berikutnya'}</p>
+              </div>
+            </Link>
+          )}
+          {targetAktif && (
+            <Link href="/rencana" className="hs-card fc-stat">
+              <span className="fc-tile fc-tile-pink"><Target size={20} /></span>
+              <div className="min-w-0 flex-1">
+                <p className="fc-stat-label">Target tabungan · {targetAktif.nama}</p>
+                <p className="fc-stat-value" style={{ fontSize: 18 }}>{Math.min(100, Math.round((Number(targetAktif.terkumpul) / Number(targetAktif.target)) * 100))}% · {rupiah(targetAktif.terkumpul)}</p>
+                <div className="w-full bg-slate-100 rounded-full h-2 mt-1"><div className="bg-pink-400 h-2 rounded-full" style={{ width: `${Math.min(100, Math.round((Number(targetAktif.terkumpul) / Number(targetAktif.target)) * 100))}%` }} /></div>
+              </div>
+            </Link>
+          )}
+        </section>
+      )}
+
       {/* Aksi cepat */}
       <section aria-label="Catat cepat">
         <div className="fc-section-title"><h3>Mau catat apa?</h3></div>
@@ -108,7 +152,7 @@ export default async function BerandaPage() {
       {/* Gamifikasi: streak, level & badge, tantangan mingguan */}
       <section className="fc-game" aria-label="Pencapaian">
         <div className="hs-card fc-streak">
-          <span className="fc-streak-flame">🔥</span>
+          <span className="fc-streak-flame"><Flame size={40} className="text-hsOrange" /></span>
           <div>
             <p className="fc-stat-value" style={{ fontSize: 30 }}>{g.streak} hari</p>
             <p className="fc-stat-sub">{g.streak ? 'berturut-turut mencatat' : 'Catat sesuatu hari ini untuk mulai streak'}</p>
@@ -116,10 +160,13 @@ export default async function BerandaPage() {
         </div>
         <div className="hs-card p-5">
           <LevelBar g={g} />
-          <p className="text-2xl mt-2 flex gap-1.5">
-            {badgeDapat.map((b) => <span key={b.nama} title={b.nama}>{b.icon}</span>)}
+          <div className="mt-2 flex gap-1.5 flex-wrap">
+            {badgeDapat.slice(0, 6).map((b) => <BadgeIkon key={b.key} ikon={b.icon} tingkat={b.tingkat} size={36} label={`${b.nama} ${TINGKAT[b.tingkat]}`} />)}
             {badgeDapat.length === 0 && <span className="text-xs text-slate-400">Belum ada badge</span>}
-          </p>
+          </div>
+          {g.hampir && (
+            <p className="text-[11px] mt-2"><b className="text-hsOrange">Sedikit lagi:</b> {g.hampir.nama} {TINGKAT[g.hampir.tingkat + 1]} ({sisaBadge(g.hampir)})</p>
+          )}
         </div>
         <Link href="/pencapaian" className="hs-card p-5 block">
           <Tantangan t={g.tantangan} />

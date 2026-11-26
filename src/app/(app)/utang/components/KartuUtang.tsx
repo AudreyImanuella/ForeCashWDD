@@ -1,7 +1,7 @@
 'use client'
 
 // Kartu satu utang/piutang: tombol Lunas (+ pilih wallet), hapus, dan pengingat WhatsApp.
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Link2 } from 'lucide-react'
 import clsx from 'clsx'
 import Flash from '@/components/Flash'
 import TombolHapus from '@/components/TombolHapus'
@@ -14,6 +14,8 @@ import { hapusUtang, tandaiLunas } from '../actions'
 export type Utang = {
   id: number; nama_teman: string; keterangan: string; nominal: number
   arah: 'piutang' | 'utang'; jatuh_tempo: string | null
+  /** tersambung dengan akun teman ForeCash */
+  tersambung?: boolean
 }
 
 export default function KartuUtang({ d, wallets, hariIni }: { d: Utang; wallets: { id: number; nama: string }[]; hariIni: string }) {
@@ -29,6 +31,11 @@ export default function KartuUtang({ d, wallets, hariIni }: { d: Utang; wallets:
             {piutang ? 'PIUTANG · dia utang ke saya' : 'UTANG · saya utang ke dia'}
           </span>
           <p className="font-black mt-2">{d.nama_teman}</p>
+          {d.tersambung && (
+            <p className="text-[10px] font-bold text-hsBlue inline-flex items-center gap-1">
+              <Link2 size={11} /> {piutang ? 'Tagihan terkirim ke akunnya' : 'Tagihan dari temanmu di ForeCash'}
+            </p>
+          )}
           <p className="text-xs text-slate-500">{d.keterangan}</p>
         </div>
         <p className="font-black shrink-0">{rupiah(d.nominal)}</p>
@@ -49,7 +56,7 @@ export default function KartuUtang({ d, wallets, hariIni }: { d: Utang; wallets:
         </form>
         <TombolHapus aksi={hapusUtang} id={d.id} pesan="Hapus catatan ini?" tampilError={false} />
       </div>
-      {piutang && (
+      {piutang && !d.tersambung && (
         <a href={linkPengingatWA(d.nama_teman, d.keterangan, d.nominal)} target="_blank" rel="noopener" className="text-[11px] font-bold text-hsGreen inline-flex items-center gap-1">
           <MessageCircle size={13} /> Kirim pengingat via WhatsApp
         </a>

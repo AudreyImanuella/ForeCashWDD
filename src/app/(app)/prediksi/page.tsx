@@ -17,10 +17,12 @@ export default async function PrediksiPage() {
   const hari = hariIni()
 
   const [wallets, teman] = await Promise.all([ambilWallet(supabase, uid), ambilPetDipakai(supabase, uid)])
-  const [f, jadwalRes] = await Promise.all([
+  const [f, jadwalRes, rencanaRes] = await Promise.all([
     ambilForecast(supabase, uid, wallets),
     supabase.from('income_schedules').select('id, sumber, nominal, tanggal_perkiraan').eq('user_id', uid).eq('status', 'menunggu').order('tanggal_perkiraan'),
+    supabase.from('rencana_pengeluaran').select('tanggal, nominal').eq('user_id', uid).eq('status', 'rencana'),
   ])
+  const rencana = (rencanaRes.data ?? []).map((r) => ({ tanggal: r.tanggal, nominal: Number(r.nominal) }))
   const jadwal = (jadwalRes.data ?? []).map((j) => ({ ...j, nominal: Number(j.nominal) })) as Jadwal[]
 
   return (
@@ -42,6 +44,7 @@ export default async function PrediksiPage() {
       <ProyeksiPanel
         hariIni={hari} saldo={f.saldo} burn={f.burn} runway={f.runway} habis={f.habis}
         pemasukanBerikut={f.next?.tanggal_perkiraan ?? null} sisaHari={f.sisaHari}
+        rencana={rencana} rencanaDulu={f.rencanaDulu}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

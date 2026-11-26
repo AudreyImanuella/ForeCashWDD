@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AuthLayout from '@/components/AuthLayout'
 import { createClient } from '@/lib/supabase/client'
+import InputSandi from '@/components/form/InputSandi'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -51,11 +52,11 @@ export default function ResetPasswordPage() {
             {error && <p className="text-sm font-bold text-hsRed" role="alert">{error}</p>}
             <div className="space-y-1">
               <label htmlFor="pw" className="text-xs font-bold uppercase tracking-wider">Kata Sandi Baru</label>
-              <input id="pw" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="w-full px-4 py-3 border text-sm font-semibold" />
+              <InputSandi id="pw" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="w-full px-4 py-3 border text-sm font-semibold" />
             </div>
             <div className="space-y-1">
               <label htmlFor="pw2" className="text-xs font-bold uppercase tracking-wider">Ulangi Kata Sandi</label>
-              <input id="pw2" type="password" required minLength={8} value={ulang} onChange={(e) => setUlang(e.target.value)} autoComplete="new-password" className="w-full px-4 py-3 border text-sm font-semibold" />
+              <InputSandi id="pw2" required minLength={8} value={ulang} onChange={(e) => setUlang(e.target.value)} autoComplete="new-password" className="w-full px-4 py-3 border text-sm font-semibold" />
             </div>
             <button disabled={loading} className="hs-btn bg-hsOrange text-white w-full py-3.5 text-base disabled:opacity-60">
               {loading ? 'Menyimpan...' : 'Simpan Kata Sandi'}

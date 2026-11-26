@@ -4,9 +4,11 @@
 // Port dari bagian kartu & <canvas> Chart.js di php-version/pages/prediksi.php, grafiknya pakai recharts.
 import { useState } from 'react'
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { proyeksi } from '@/lib/forecast'
+import Link from 'next/link'
+import { proyeksi, type RencanaBayar } from '@/lib/forecast'
 import { rupiah } from '@/lib/format'
 import { tgl, tglPendek } from '@/lib/tanggal'
+import InputRupiah from '@/components/form/InputRupiah'
 
 type Props = {
   hariIni: string
@@ -16,6 +18,10 @@ type Props = {
   habis: string | null
   pemasukanBerikut: string | null
   sisaHari: number | null
+  /** rencana pengeluaran yang belum dibayar (fitur Rencana) */
+  rencana?: RencanaBayar[]
+  /** total rencana sebelum pemasukan berikutnya */
+  rencanaDulu?: number
 }
 
 const WARNA_GARIS = '#FF8A1F' // oranye koin ForeCash
@@ -27,17 +33,17 @@ function ribuan(v: number) {
   return v === 0 ? '0' : `${Math.round(v / 1000)}rb`
 }
 
-export default function ProyeksiPanel({ hariIni, saldo, burn, runway, habis, pemasukanBerikut, sisaHari }: Props) {
+export default function ProyeksiPanel({ hariIni, saldo, burn, runway, habis, pemasukanBerikut, sisaHari, rencana = [], rencanaDulu = 0 }: Props) {
   // simulasi: kalau pengeluaran per hari diubah, berapa lama saldo bertahan?
   const [sim, setSim] = useState(String(Math.round(burn)))
   const simBurn = Number(sim)
   const burnDipakai = simBurn > 0 ? simBurn : burn
-  const data = proyeksi({ saldo, burn: burnDipakai }, hariIni, 30).map((p) => ({ ...p, label: tglPendek(p.tanggal) }))
+  const data = proyeksi({ saldo, burn: burnDipakai }, hariIni, 30, rencana).map((p) => ({ ...p, label: tglPendek(p.tanggal) }))
   const tandaGajian = sisaHari !== null && sisaHari <= 30 ? data[sisaHari]?.label : undefined
 
   let hasilSim = ''
   if (simBurn > 0) {
-    const run = Math.floor(Math.max(0, saldo) / simBurn)
+    const run = Math.floor(Math.max(0, saldo - rencanaDulu) / simBurn)
     hasilSim = `Saldo bertahan ${run} hari` +
       (sisaHari !== null ? (run >= sisaHari ? ' — aman sampai pemasukan berikutnya.' : ` — masih kurang ${sisaHari - run} hari.`) : '.')
   }
@@ -48,6 +54,9 @@ export default function ProyeksiPanel({ hariIni, saldo, burn, runway, habis, pem
         <h4 className="text-sm font-black border-b pb-2">Hasil Perhitungan</h4>
         <div className="text-sm space-y-2">
           <p className="flex justify-between gap-2"><span className="text-slate-500">Total saldo</span><b>{rupiah(saldo)}</b></p>
+          {rencanaDulu > 0 && (
+            <p className="flex justify-between gap-2"><span className="text-slate-500">Rencana sebelum pemasukan</span><Link href="/rencana" className="font-bold text-hsOrange">−{rupiah(rencanaDulu)}</Link></p>
+          )}
           <p className="flex justify-between gap-2"><span className="text-slate-500">Burn rate</span><b>{rupiah(burn)}/hari</b></p>
           <p className="flex justify-between gap-2"><span className="text-slate-500">Runway</span><b>{runway !== null ? `${runway} hari` : '-'}</b></p>
           <p className="flex justify-between gap-2"><span className="text-slate-500">Perkiraan saldo habis</span><b>{habis ? tgl(habis) : '-'}</b></p>
@@ -55,7 +64,7 @@ export default function ProyeksiPanel({ hariIni, saldo, burn, runway, habis, pem
         </div>
         <div className="pt-3 border-t space-y-2">
           <label htmlFor="simBurn" className="text-xs font-bold">Simulasi: jika pengeluaran per hari menjadi</label>
-          <input id="simBurn" type="number" min="0" step="1000" value={sim} onChange={(e) => setSim(e.target.value)} className="w-full px-3 py-2 text-xs border" />
+          <InputRupiah id="simBurn" value={sim} onValueChange={setSim} />
           {hasilSim && <p className="text-xs font-bold text-hsBlue" aria-live="polite">{hasilSim}</p>}
         </div>
       </div>
